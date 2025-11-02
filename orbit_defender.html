@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbit Defender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(to bottom, #0a0e27 0%, #1a1a3e 100%);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            position: relative;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+        }
+        #gameCanvas {
+            border: 3px solid #4a5568;
+            box-shadow: 0 0 30px rgba(100, 150, 255, 0.5);
+            background: radial-gradient(circle at center, #1a1a3e 0%, #0a0e27 100%);
+            max-width: 100%;
+            height: auto;
+            touch-action: none;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            font-size: 16px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            gap: 20px;
+        }
+        .control-group {
+            display: flex;
+            gap: 15px;
+        }
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 3px solid #4a5568;
+            background: rgba(66, 153, 225, 0.3);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(66, 153, 225, 0.6);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+        }
+        .control-btn.shoot {
+            width: 80px;
+            height: 80px;
+            background: rgba(239, 68, 68, 0.4);
+            border-color: #ff4444;
+        }
+        .control-btn.shoot:active {
+            background: rgba(239, 68, 68, 0.7);
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border-radius: 10px;
+            color: #fff;
+            text-align: center;
+            display: none;
+            border: 2px solid #4a5568;
+            z-index: 1000;
+            max-width: 90%;
+        }
+        button {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 16px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #3182ce;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        @media (max-width: 768px) {
+            #ui {
+                font-size: 14px;
+                top: 5px;
+                left: 5px;
+            }
+            #mobileControls {
+                display: flex;
+            }
+            #gameCanvas {
+                width: 100%;
+                height: auto;
+            }
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 20px;
+            }
+            .control-btn.shoot {
+                width: 70px;
+                height: 70px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #ui {
+                font-size: 12px;
+            }
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+            .control-btn.shoot {
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div style="margin-top: 10px;">
+            <div style="font-size: 14px; margin-bottom: 5px;">Health:</div>
+            <div style="width: 200px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid #4a5568; border-radius: 10px; overflow: hidden;">
+                <div id="healthBar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #00ff00 0%, #44ff44 100%); transition: width 0.3s ease, background 0.3s ease;"></div>
+            </div>
+        </div>
+        <div style="margin-top: 10px;">
+            <div style="font-size: 14px; margin-bottom: 5px;">Ammo: <span id="ammo" style="color: #ffaa00; font-weight: bold;">20</span></div>
+        </div>
+        <div style="margin-top: 10px; font-size: 14px; display: none;" id="desktopControls">Press SPACE to shoot!<br>← → arrows to rotate</div>
+    </div>
+    
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+    
+    <div id="mobileControls">
+        <div class="control-group">
+            <div class="control-btn" id="leftBtn">◄</div>
+            <div class="control-btn" id="rightBtn">►</div>
+        </div>
+        <div class="control-btn shoot" id="shootBtn">🔫</div>
+    </div>
+    
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="restartGame()">Play Again</button>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Create star background
+        for (let i = 0; i < 100; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * window.innerWidth + 'px';
+            star.style.top = Math.random() * window.innerHeight + 'px';
+            star.style.width = star.style.height = Math.random() * 3 + 'px';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            document.body.appendChild(star);
+        }
+        
+        let gameState = {
+            score: 0,
+            health: 100,
+            planetAngle: 0,
+            meteors: [],
+            bullets: [],
+            particles: [],
+            alienShips: [],
+            alienBullets: [],
+            running: true,
+            meteorSpawnRate: 0,
+            lastSpawnIncrease: 0,
+            lastAlienSpawn: Date.now(),
+            keys: {},
+            shieldActive: false,
+            shieldEndTime: 0,
+            ammunition: 20,
+            maxMeteorsAtOnce: 1,
+            currentMeteorCount: 0,
+            alienMode: false,
+            gameTime: 0
+        };
+        
+        const planet = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 40,
+            rotationSpeed: 0.01,
+            manualRotationSpeed: 0.05
+        };
+        
+        const turret = {
+            length: 25,
+            width: 8
+        };
+        
+        // Audio context for sound effects and music
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let backgroundMusic = null;
+        let musicGainNode = null;
+        let musicPlaybackRate = 1;
+        
+        function updateHealthBar() {
+            const healthBar = document.getElementById('healthBar');
+            const healthPercent = (gameState.health / 100) * 100;
+            healthBar.style.width = healthPercent + '%';
+            
+            if (healthPercent > 60) {
+                healthBar.style.background = 'linear-gradient(90deg, #00ff00 0%, #44ff44 100%)';
+            } else if (healthPercent > 30) {
+                healthBar.style.background = 'linear-gradient(90deg, #ffaa00 0%, #ffdd00 100%)';
+            } else {
+                healthBar.style.background = 'linear-gradient(90deg, #ff0000 0%, #ff4444 100%)';
+            }
+        }
+        
+        function playShootSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        }
+        
+        function playExplosionSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            
+            oscillator.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+            
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(2000, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+        
+        function playPlanetExplosion() {
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    const filter = audioCtx.createBiquadFilter();
+                    
+                    oscillator.connect(filter);
+                    filter.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.setValueAtTime(150 - i * 30, audioCtx.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.5);
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(3000, audioCtx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                    
+                    gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                    
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.5);
+                }, i * 150);
+            }
+        }
+        
+        function startBackgroundMusic() {
+            if (backgroundMusic) return;
+            
+            const notes = [262, 294, 330, 349, 392, 440, 494, 523];
+            const melody = [0, 2, 4, 2, 0, 2, 4, 2, 4, 5, 7, 4, 5, 7];
+            let noteIndex = 0;
+            
+            musicGainNode = audioCtx.createGain();
+            musicGainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            musicGainNode.connect(audioCtx.destination);
+            
+            function playNote() {
+                if (!gameState.running) return;
+                
+                const healthPercent = gameState.health / 100;
+                musicPlaybackRate = 0.5 + (healthPercent * 0.5);
+                const distortion = 1 - healthPercent;
+                
+                const oscillator = audioCtx.createOscillator();
+                const noteGain = audioCtx.createGain();
+                
+                oscillator.connect(noteGain);
+                noteGain.connect(musicGainNode);
+                
+                oscillator.type = 'sine';
+                const baseFreq = notes[melody[noteIndex]];
+                const detuneAmount = distortion * 30 * (Math.random() - 0.5);
+                oscillator.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+                oscillator.detune.setValueAtTime(detuneAmount, audioCtx.currentTime);
+                
+                noteGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                noteGain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.05);
+                noteGain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.3);
+                noteGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.5);
+                
+                noteIndex = (noteIndex + 1) % melody.length;
+                
+                const nextNoteDelay = 500 / musicPlaybackRate;
+                setTimeout(playNote, nextNoteDelay);
+            }
+            
+            backgroundMusic = true;
+            playNote();
+        }
+        
+        class Meteor {
+            constructor(isSpecial = false) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.max(canvas.width, canvas.height);
+                this.x = planet.x + Math.cos(angle) * distance;
+                this.y = planet.y + Math.sin(angle) * distance;
+                this.isSpecial = isSpecial;
+                this.radius = isSpecial ? 20 : Math.random() * 15 + 10;
+                this.speed = isSpecial ? 0.8 : Math.random() * 1 + 0.5;
+                const directionToPlanet = Math.atan2(planet.y - this.y, planet.x - this.x);
+                const randomOffset = (Math.random() - 0.5) * 0.3;
+                this.dx = Math.cos(directionToPlanet + randomOffset) * this.speed;
+                this.dy = Math.sin(directionToPlanet + randomOffset) * this.speed;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+                this.glowPhase = 0;
+            }
+            
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.rotation += this.rotationSpeed;
+                if (this.isSpecial) {
+                    this.glowPhase += 0.1;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                if (this.isSpecial) {
+                    const glowIntensity = Math.sin(this.glowPhase) * 0.5 + 0.5;
+                    ctx.shadowBlur = 20 + glowIntensity * 20;
+                    ctx.shadowColor = '#00ffff';
+                    ctx.fillStyle = '#00ddff';
+                    ctx.strokeStyle = '#00ffff';
+                } else {
+                    ctx.fillStyle = '#8b4513';
+                    ctx.strokeStyle = '#654321';
+                }
+                
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const r = this.radius * (0.8 + Math.random() * 0.4);
+                    const x = Math.cos(angle) * r;
+                    const y = Math.sin(angle) * r;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                if (this.isSpecial) {
+                    ctx.shadowBlur = 0;
+                }
+                
+                ctx.restore();
+            }
+            
+            collidesWithPlanet() {
+                const dist = Math.hypot(this.x - planet.x, this.y - planet.y);
+                return dist < planet.radius + this.radius;
+            }
+        }
+        
+        class Bullet {
+            constructor(x, y, angle) {
+                this.x = x;
+                this.y = y;
+                this.radius = 4;
+                this.speed = 8;
+                this.dx = Math.cos(angle) * this.speed;
+                this.dy = Math.sin(angle) * this.speed;
+            }
+            
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+            }
+            
+            draw() {
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffaa00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            isOffScreen() {
+                return this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height;
+            }
+        }
+        
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.radius = Math.random() * 3 + 1;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 3 + 1;
+                this.dx = Math.cos(angle) * speed;
+                this.dy = Math.sin(angle) * speed;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.01;
+            }
+            
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.life -= this.decay;
+                this.dy += 0.1;
+            }
+            
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        class AlienShip {
+            constructor() {
+                const side = Math.floor(Math.random() * 4);
+                if (side === 0) {
+                    this.x = Math.random() * canvas.width;
+                    this.y = -50;
+                } else if (side === 1) {
+                    this.x = canvas.width + 50;
+                    this.y = Math.random() * canvas.height;
+                } else if (side === 2) {
+                    this.x = Math.random() * canvas.width;
+                    this.y = canvas.height + 50;
+                } else {
+                    this.x = -50;
+                    this.y = Math.random() * canvas.height;
+                }
+                
+                this.color = '#00ff00';
+                this.health = 3;
+                this.maxHealth = 3;
+                this.points = 50;
+                this.width = 48;
+                this.height = 30;
+                this.speed = 2;
+                this.shootCooldown = 0;
+                this.shootInterval = 80 + Math.random() * 40;
+                
+                this.orbitAngle = Math.atan2(planet.y - this.y, planet.x - this.x);
+                this.orbitDistance = 180 + Math.random() * 80;
+                this.orbitSpeed = (Math.random() - 0.5) * 0.03;
+                this.movementPhase = 0;
+                this.movementPattern = Math.random();
+            }
+            
+            update() {
+                this.movementPhase += 0.02;
+                
+                if (this.movementPattern < 0.33) {
+                    this.orbitAngle += this.orbitSpeed;
+                    const wobble = Math.sin(this.movementPhase * 3) * 30;
+                    this.x = planet.x + Math.cos(this.orbitAngle) * (this.orbitDistance + wobble);
+                    this.y = planet.y + Math.sin(this.orbitAngle) * (this.orbitDistance + wobble);
+                } else if (this.movementPattern < 0.66) {
+                    this.orbitAngle += this.orbitSpeed * 1.5;
+                    const radiusChange = Math.sin(this.movementPhase) * 50;
+                    this.x = planet.x + Math.cos(this.orbitAngle) * (this.orbitDistance + radiusChange);
+                    this.y = planet.y + Math.sin(this.orbitAngle) * (this.orbitDistance + radiusChange);
+                } else {
+                    this.orbitAngle += this.orbitSpeed;
+                    const figure8 = Math.sin(this.movementPhase * 2) * 40;
+                    this.x = planet.x + Math.cos(this.orbitAngle) * this.orbitDistance + figure8;
+                    this.y = planet.y + Math.sin(this.orbitAngle) * this.orbitDistance;
+                }
+                
+                this.shootCooldown++;
+                if (this.shootCooldown >= this.shootInterval) {
+                    this.shoot();
+                    this.shootCooldown = 0;
+                }
+            }
+            
+            shoot() {
+                const angle = Math.atan2(planet.y - this.y, planet.x - this.x);
+                const spread = (Math.random() - 0.5) * 0.3;
+                gameState.alienBullets.push(new AlienBullet(this.x, this.y, angle + spread));
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                const angle = Math.atan2(planet.y - this.y, planet.x - this.x);
+                ctx.rotate(angle);
+                
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(this.width / 2, 0);
+                ctx.lineTo(-this.width / 2, this.height / 2);
+                ctx.lineTo(-this.width / 4, 0);
+                ctx.lineTo(-this.width / 2, -this.height / 2);
+                ctx.closePath();
+                ctx.fill();
+                
+                const healthPercent = this.health / this.maxHealth;
+                const healthColor = healthPercent === 1 ? '#ffffff' : 
+                                   healthPercent > 0.5 ? '#ffff00' : '#ff0000';
+                ctx.strokeStyle = healthColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(this.width / 4, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+            
+            collidesWithPoint(x, y, radius) {
+                return Math.hypot(this.x - x, this.y - y) < this.width / 2 + radius;
+            }
+        }
+        
+        class AlienBullet {
+            constructor(x, y, angle) {
+                this.x = x;
+                this.y = y;
+                this.radius = 5;
+                this.speed = 4;
+                this.dx = Math.cos(angle) * this.speed;
+                this.dy = Math.sin(angle) * this.speed;
+            }
+            
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+            }
+            
+            draw() {
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#00cc00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            isOffScreen() {
+                return this.x < -50 || this.x > canvas.width + 50 || this.y < -50 || this.y > canvas.height + 50;
+            }
+            
+            collidesWithPlanet() {
+                const dist = Math.hypot(this.x - planet.x, this.y - planet.y);
+                return dist < planet.radius + this.radius;
+            }
+        }
+        
+        function drawPlanet() {
+            const healthPercent = gameState.health / 100;
+            
+            if (gameState.shieldActive) {
+                const currentTime = Date.now();
+                const shieldTimeLeft = (gameState.shieldEndTime - currentTime) / 1000;
+                
+                if (shieldTimeLeft > 0) {
+                    const pulsePhase = currentTime / 200;
+                    const pulseSize = Math.sin(pulsePhase) * 5 + 65;
+                    
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#00ffff';
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, pulseSize, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, pulseSize + 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    ctx.shadowBlur = 0;
+                } else {
+                    gameState.shieldActive = false;
+                }
+            }
+            
+            const baseColor = {
+                r: 65 + (155 - 65) * (1 - healthPercent),
+                g: 105 + (105 - 105) * (1 - healthPercent),
+                b: 225 + (100 - 225) * (1 - healthPercent)
+            };
+            
+            ctx.fillStyle = `rgb(${baseColor.r}, ${baseColor.g}, ${baseColor.b})`;
+            ctx.beginPath();
+            ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (healthPercent > 0.3) {
+                const spotOpacity = healthPercent;
+                ctx.globalAlpha = spotOpacity;
+                ctx.fillStyle = '#2d5aa3';
+                ctx.beginPath();
+                ctx.arc(planet.x - 10, planet.y - 10, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(planet.x + 15, planet.y + 5, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            if (healthPercent < 0.7) {
+                ctx.strokeStyle = `rgba(50, 50, 50, ${0.8 * (1 - healthPercent)})`;
+                ctx.lineWidth = 2;
+                
+                const numCracks = Math.floor((1 - healthPercent) * 8);
+                for (let i = 0; i < numCracks; i++) {
+                    const angle = (i / numCracks) * Math.PI * 2 + gameState.health * 0.1;
+                    const startDist = planet.radius * 0.5;
+                    const endDist = planet.radius * 0.95;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        planet.x + Math.cos(angle) * startDist,
+                        planet.y + Math.sin(angle) * startDist
+                    );
+                    
+                    const segments = 3;
+                    for (let j = 1; j <= segments; j++) {
+                        const dist = startDist + (endDist - startDist) * (j / segments);
+                        const offset = (Math.sin(i * 123 + j) * 0.3) * (1 - healthPercent);
+                        ctx.lineTo(
+                            planet.x + Math.cos(angle + offset) * dist,
+                            planet.y + Math.sin(angle + offset) * dist
+                        );
+                    }
+                    ctx.stroke();
+                }
+            }
+            
+            ctx.strokeStyle = healthPercent > 0.5 ? '#5a8fd6' : `rgb(${90 + (150-90)*(1-healthPercent)}, ${143*(healthPercent)}, ${214*(healthPercent)})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        function drawTurret() {
+            const turretX = planet.x + Math.cos(gameState.planetAngle) * planet.radius;
+            const turretY = planet.y + Math.sin(gameState.planetAngle) * planet.radius;
+            
+            ctx.save();
+            ctx.translate(turretX, turretY);
+            ctx.rotate(gameState.planetAngle);
+            
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(0, -turret.width / 2, turret.length, turret.width);
+            ctx.strokeStyle = '#cc0000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, -turret.width / 2, turret.length, turret.width);
+            
+            ctx.restore();
+        }
+        
+        function spawnMeteor() {
+            if (gameState.alienMode || gameState.alienShips.length > 0) {
+                return;
+            }
+            
+            if (gameState.currentMeteorCount < 1) {
+                if (Math.random() < 0.015) {
+                    const isSpecial = Math.random() < 0.1;
+                    gameState.meteors.push(new Meteor(isSpecial));
+                    gameState.currentMeteorCount++;
+                }
+            }
+        }
+        
+        function shoot() {
+            if (gameState.ammunition <= 0) {
+                return;
+            }
+            
+            const turretX = planet.x + Math.cos(gameState.planetAngle) * (planet.radius + turret.length);
+            const turretY = planet.y + Math.sin(gameState.planetAngle) * (planet.radius + turret.length);
+            gameState.bullets.push(new Bullet(turretX, turretY, gameState.planetAngle));
+            gameState.ammunition--;
+            document.getElementById('ammo').textContent = gameState.ammunition;
+            playShootSound();
+        }
+        
+        function checkCollisions() {
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                const bullet = gameState.bullets[i];
+                
+                for (let j = gameState.meteors.length - 1; j >= 0; j--) {
+                    const meteor = gameState.meteors[j];
+                    const dist = Math.hypot(bullet.x - meteor.x, bullet.y - meteor.y);
+                    
+                    if (dist < bullet.radius + meteor.radius) {
+                        for (let k = 0; k < 10; k++) {
+                            const color = meteor.isSpecial ? '#00ffff' : '#ff8800';
+                            gameState.particles.push(new Particle(meteor.x, meteor.y, color));
+                        }
+                        
+                        if (meteor.isSpecial) {
+                            gameState.shieldActive = true;
+                            gameState.shieldEndTime = Date.now() + 5000;
+                        }
+                        
+                        gameState.meteors.splice(j, 1);
+                        gameState.currentMeteorCount--;
+                        gameState.bullets.splice(i, 1);
+                        gameState.score += meteor.isSpecial ? 30 : 10;
+                        gameState.ammunition += 10;
+                        document.getElementById('score').textContent = gameState.score;
+                        document.getElementById('ammo').textContent = gameState.ammunition;
+                        playExplosionSound();
+                        break;
+                    }
+                }
+                
+                for (let j = gameState.alienShips.length - 1; j >= 0; j--) {
+                    const alien = gameState.alienShips[j];
+                    if (alien.collidesWithPoint(bullet.x, bullet.y, bullet.radius)) {
+                        alien.health--;
+                        gameState.bullets.splice(i, 1);
+                        
+                        for (let k = 0; k < 5; k++) {
+                            gameState.particles.push(new Particle(alien.x, alien.y, alien.color));
+                        }
+                        
+                        if (alien.health <= 0) {
+                            for (let k = 0; k < 20; k++) {
+                                gameState.particles.push(new Particle(alien.x, alien.y, alien.color));
+                            }
+                            gameState.alienShips.splice(j, 1);
+                            gameState.score += alien.points;
+                            gameState.ammunition += 20;
+                            gameState.alienMode = false;
+                            document.getElementById('score').textContent = gameState.score;
+                            document.getElementById('ammo').textContent = gameState.ammunition;
+                            playExplosionSound();
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            if (gameState.shieldActive) {
+                const shieldRadius = 65;
+                
+                for (let i = gameState.meteors.length - 1; i >= 0; i--) {
+                    const meteor = gameState.meteors[i];
+                    const distToShield = Math.hypot(meteor.x - planet.x, meteor.y - planet.y);
+                    
+                    if (distToShield < shieldRadius + meteor.radius) {
+                        for (let k = 0; k < 15; k++) {
+                            gameState.particles.push(new Particle(meteor.x, meteor.y, '#00ffff'));
+                        }
+                        gameState.meteors.splice(i, 1);
+                        gameState.currentMeteorCount--;
+                        playExplosionSound();
+                    }
+                }
+                
+                for (let i = gameState.alienBullets.length - 1; i >= 0; i--) {
+                    const alienBullet = gameState.alienBullets[i];
+                    const distToShield = Math.hypot(alienBullet.x - planet.x, alienBullet.y - planet.y);
+                    
+                    if (distToShield < shieldRadius + alienBullet.radius) {
+                        for (let k = 0; k < 10; k++) {
+                            gameState.particles.push(new Particle(alienBullet.x, alienBullet.y, '#00ffff'));
+                        }
+                        gameState.alienBullets.splice(i, 1);
+                        playExplosionSound();
+                    }
+                }
+                
+                for (let i = gameState.alienShips.length - 1; i >= 0; i--) {
+                    const alien = gameState.alienShips[i];
+                    const distToShield = Math.hypot(alien.x - planet.x, alien.y - planet.y);
+                    
+                    if (distToShield < shieldRadius + alien.width / 2) {
+                        for (let k = 0; k < 30; k++) {
+                            gameState.particles.push(new Particle(alien.x, alien.y, alien.color));
+                        }
+                        gameState.alienShips.splice(i, 1);
+                        gameState.alienMode = false;
+                        playExplosionSound();
+                    }
+                }
+            } else {
+                for (let i = gameState.meteors.length - 1; i >= 0; i--) {
+                    const meteor = gameState.meteors[i];
+                    if (meteor.collidesWithPlanet()) {
+                        for (let k = 0; k < 15; k++) {
+                            gameState.particles.push(new Particle(meteor.x, meteor.y, '#ff0000'));
+                        }
+                        gameState.meteors.splice(i, 1);
+                        gameState.currentMeteorCount--;
+                        gameState.health -= 20;
+                        updateHealthBar();
+                        playExplosionSound();
+                        
+                        if (gameState.health <= 0) {
+                            gameState.health = 0;
+                            endGame();
+                        }
+                    }
+                }
+                
+                for (let i = gameState.alienBullets.length - 1; i >= 0; i--) {
+                    const alienBullet = gameState.alienBullets[i];
+                    if (alienBullet.collidesWithPlanet()) {
+                        for (let k = 0; k < 10; k++) {
+                            gameState.particles.push(new Particle(alienBullet.x, alienBullet.y, '#ff0000'));
+                        }
+                        gameState.alienBullets.splice(i, 1);
+                        gameState.health -= 15;
+                        updateHealthBar();
+                        playExplosionSound();
+                        
+                        if (gameState.health <= 0) {
+                            gameState.health = 0;
+                            endGame();
+                        }
+                    }
+                }
+            }
+        }
+        
+        function endGame() {
+            gameState.running = false;
+            
+            playPlanetExplosion();
+            
+            const explosionDuration = 100;
+            for (let i = 0; i < explosionDuration; i++) {
+                setTimeout(() => {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * planet.radius;
+                    const x = planet.x + Math.cos(angle) * distance;
+                    const y = planet.y + Math.sin(angle) * distance;
+                    
+                    for (let j = 0; j < 5; j++) {
+                        gameState.particles.push(new Particle(x, y, ['#ff0000', '#ff4400', '#ff8800', '#ffaa00'][Math.floor(Math.random() * 4)]));
+                    }
+                    
+                    if (i === explosionDuration - 1) {
+                        setTimeout(() => {
+                            document.getElementById('finalScore').textContent = gameState.score;
+                            document.getElementById('gameOver').style.display = 'block';
+                        }, 500);
+                    }
+                }, i * 30);
+            }
+        }
+        
+        function restartGame() {
+            gameState = {
+                score: 0,
+                health: 100,
+                planetAngle: 0,
+                meteors: [],
+                bullets: [],
+                particles: [],
+                alienShips: [],
+                alienBullets: [],
+                running: true,
+                meteorSpawnRate: 0,
+                lastSpawnIncrease: 0,
+                lastAlienSpawn: Date.now(),
+                keys: {},
+                shieldActive: false,
+                shieldEndTime: 0,
+                ammunition: 20,
+                maxMeteorsAtOnce: 1,
+                currentMeteorCount: 0,
+                alienMode: false,
+                gameTime: 0
+            };
+            document.getElementById('score').textContent = '0';
+            document.getElementById('ammo').textContent = '20';
+            updateHealthBar();
+            document.getElementById('gameOver').style.display = 'none';
+            backgroundMusic = null;
+            musicGainNode = null;
+            musicPlaybackRate = 1;
+            gameLoop();
+        }
+        
+        function gameLoop() {
+            if (!gameState.running) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (gameState.keys['ArrowLeft']) {
+                gameState.planetAngle -= planet.manualRotationSpeed;
+            }
+            if (gameState.keys['ArrowRight']) {
+                gameState.planetAngle += planet.manualRotationSpeed;
+            }
+            
+            if (!gameState.keys['ArrowLeft'] && !gameState.keys['ArrowRight']) {
+                gameState.planetAngle += planet.rotationSpeed;
+            }
+            
+            if (gameState.score - gameState.lastSpawnIncrease > 100) {
+                gameState.meteorSpawnRate = Math.min(0.05, gameState.meteorSpawnRate + 0.005);
+                gameState.lastSpawnIncrease = gameState.score;
+            }
+            
+            const currentTime = Date.now();
+            if (currentTime - gameState.lastAlienSpawn > 15000) {
+                gameState.alienShips.push(new AlienShip());
+                gameState.lastAlienSpawn = currentTime;
+            }
+            
+            startBackgroundMusic();
+            
+            spawnMeteor();
+            
+            drawPlanet();
+            drawTurret();
+            
+            for (let i = gameState.meteors.length - 1; i >= 0; i--) {
+                gameState.meteors[i].update();
+                gameState.meteors[i].draw();
+            }
+            
+            for (let i = gameState.alienShips.length - 1; i >= 0; i--) {
+                gameState.alienShips[i].update();
+                gameState.alienShips[i].draw();
+            }
+            
+            for (let i = gameState.alienBullets.length - 1; i >= 0; i--) {
+                gameState.alienBullets[i].update();
+                gameState.alienBullets[i].draw();
+                
+                if (gameState.alienBullets[i].isOffScreen()) {
+                    gameState.alienBullets.splice(i, 1);
+                }
+            }
+            
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                gameState.bullets[i].update();
+                gameState.bullets[i].draw();
+                
+                if (gameState.bullets[i].isOffScreen()) {
+                    gameState.bullets.splice(i, 1);
+                }
+            }
+            
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                gameState.particles[i].update();
+                gameState.particles[i].draw();
+                
+                if (gameState.particles[i].life <= 0) {
+                    gameState.particles.splice(i, 1);
+                }
+            }
+            
+            checkCollisions();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        canvas.addEventListener('click', () => {
+            // Click disabled - use space bar or mobile button
+        });
+        
+        // Desktop keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                gameState.keys['ArrowLeft'] = true;
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                gameState.keys['ArrowRight'] = true;
+            }
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                if (gameState.running && !gameState.keys['Space']) {
+                    gameState.keys['Space'] = true;
+                    shoot();
+                }
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') {
+                gameState.keys['ArrowLeft'] = false;
+            }
+            if (e.key === 'ArrowRight') {
+                gameState.keys['ArrowRight'] = false;
+            }
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                gameState.keys['Space'] = false;
+            }
+        });
+        
+        // Mobile touch controls
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const shootBtn = document.getElementById('shootBtn');
+        
+        // Left button
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowLeft'] = true;
+        });
+        leftBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowLeft'] = false;
+        });
+        leftBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowLeft'] = false;
+        });
+        
+        // Right button
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowRight'] = true;
+        });
+        rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowRight'] = false;
+        });
+        rightBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            gameState.keys['ArrowRight'] = false;
+        });
+        
+        // Shoot button
+        shootBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState.running) {
+                shoot();
+            }
+        });
+        
+        // Also support mouse events for testing on desktop
+        leftBtn.addEventListener('mousedown', () => gameState.keys['ArrowLeft'] = true);
+        leftBtn.addEventListener('mouseup', () => gameState.keys['ArrowLeft'] = false);
+        leftBtn.addEventListener('mouseleave', () => gameState.keys['ArrowLeft'] = false);
+        
+        rightBtn.addEventListener('mousedown', () => gameState.keys['ArrowRight'] = true);
+        rightBtn.addEventListener('mouseup', () => gameState.keys['ArrowRight'] = false);
+        rightBtn.addEventListener('mouseleave', () => gameState.keys['ArrowRight'] = false);
+        
+        shootBtn.addEventListener('mousedown', () => {
+            if (gameState.running) shoot();
+        });
+        
+        // Detect if mobile and show/hide controls accordingly
+        function checkMobile() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            if (!isMobile) {
+                document.getElementById('desktopControls').style.display = 'block';
+            }
+        }
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        
+        gameLoop();
+    </script>
+</body>
+</html>
